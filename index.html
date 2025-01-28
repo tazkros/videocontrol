@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>YOUTUBE VIDEO CONTROL</title>
+    <style>
+        #controls {
+            margin-top: 20px;
+        }
+        .slider {
+            display: block;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>YOUTUBE VIDEO CONTROL</h1>
+    <div>
+        <label for="youtubeUrl">URL de YouTube:</label>
+        <input type="text" id="youtubeUrl" placeholder="Ingrese la URL del video">
+        <button id="loadVideo">Cargar Video</button>
+    </div>
+    <div id="player"></div>
+    <div id="controls">
+        <label for="speedControl">Velocidad de reproducción:</label>
+        <input type="range" id="speedControl" class="slider" min="0.25" max="8" step="0.25" value="4">
+        
+        <label for="pitchControl">Tono del audio:</label>
+        <input type="range" id="pitchControl" class="slider" min="0.25" max="8" step="0.1" value="4">
+        
+        <label for="volumeControl">Volumen:</label>
+        <input type="range" id="volumeControl" class="slider" min="0" max="100" step="1" value="60">
+        
+        <button id="playButton">Reproducir</button>
+        <button id="stopButton">Detener</button>
+    </div>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        let player;
+        let audioContext;
+        let sourceNode;
+        let gainNode;
+        let pitchNode;
+
+        // Cargar la API de YouTube
+        function onYouTubeIframeAPIReady() {
+            document.getElementById('loadVideo').addEventListener('click', loadVideo);
+        }
+
+        function loadVideo() {
+            const url = document.getElementById('youtubeUrl').value;
+            const videoId = extractVideoId(url);
+            if (videoId) {
+                if (player) {
+                    player.loadVideoById(videoId);
+                } else {
+                    player = new YT.Player('player', {
+                        height: '195',
+                        width: '320',
+                        videoId: videoId,
+                        events: {
+                            'onReady': onPlayerReady,
+                            'onStateChange': onPlayerStateChange
+                        }
+                    });
+                }
+            } else {
+                alert('Por favor, ingrese una URL válida de YouTube.');
+            }
+        }
+
+        function extractVideoId(url) {
+            const regex = /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([^&]+)|youtu\.be\/([^?&]+)/;
+            const match = url.match(regex);
+            return match ? match[1] || match[2] : null;
+        }
+
+        function onPlayerReady(event) {
+            initializeAudioContext();
+            document.getElementById('playButton').addEventListener('click', () => player.playVideo());
+            document.getElementById('stopButton').addEventListener('click', () => player.stopVideo());
+            document.getElementById('speedControl').addEventListener('input', (e) => {
+                const speed = parseFloat(e.target.value);
+                player.setPlaybackRate(speed);
+            });
+            document.getElementById('volumeControl').addEventListener('input', (e) => {
+                const volume = parseInt(e.target.value);
+                player.setVolume(volume);
+            });
+            document.getElementById('pitchControl').addEventListener('input', (e) => {
+                const pitch = parseFloat(e.target.value);
+                if (pitchNode) {
+                    pitchNode.playbackRate.value = pitch;
+                }
+            });
+        }
+
+        function onPlayerStateChange(event) {
+            if (event.data == YT.PlayerState.PLAYING) {
+                connectAudioNodes();
+            } else {
+                disconnectAudioNodes();
+            }
+        }
+
+        function initializeAudioContext() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            gainNode = audioContext.createGain();
+            pitchNode = audioContext.createBufferSource();
+        }
+
+        function connectAudioNodes() {
+            const mediaElement = player.getIframe();
+            const mediaSource = audioContext.createMediaElementSource(mediaElement);
+            mediaSource.connect(pitchNode);
+            pitchNode.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+        }
+
+        function disconnectAudioNodes() {
+            if (pitchNode) {
+                pitchNode.disconnect();
+            }
+            if (gainNode) {
+                gainNode.disconnect();
+            }
+        }
+    </script>
+</body>
+</html>
